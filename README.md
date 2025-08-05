@@ -72,7 +72,7 @@ npm run deploy
 
 Add new tools in `tools.ts` using the tool builder:
 
-```typescript
+```ts
 // Example of a tool that requires confirmation
 const searchDatabase = tool({
   description: "Search the database for user records",
