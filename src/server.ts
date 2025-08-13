@@ -8,7 +8,7 @@ import {
   generateId,
   streamText,
   type StreamTextOnFinishCallback,
-  type ToolSet,
+  type ToolSet
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls } from "./utils";
@@ -42,7 +42,7 @@ export class Chat extends AIChatAgent<Env> {
     // Collect all tools, including MCP tools
     const allTools = {
       ...tools,
-      ...this.mcp.unstable_getAITools(),
+      ...this.mcp.unstable_getAITools()
     };
 
     // Create a streaming response that handles both text and tool outputs
@@ -54,7 +54,7 @@ export class Chat extends AIChatAgent<Env> {
           messages: this.messages,
           dataStream,
           tools: allTools,
-          executions,
+          executions
         });
 
         // Stream the AI response using GPT-4
@@ -77,12 +77,12 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           onError: (error) => {
             console.error("Error while streaming:", error);
           },
-          maxSteps: 10,
+          maxSteps: 10
         });
 
         // Merge the AI response stream with tool execution outputs
         result.mergeIntoDataStream(dataStream);
-      },
+      }
     });
 
     return dataStreamResponse;
@@ -94,8 +94,8 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         id: generateId(),
         role: "user",
         content: `Running scheduled task: ${description}`,
-        createdAt: new Date(),
-      },
+        createdAt: new Date()
+      }
     ]);
   }
 }
@@ -110,7 +110,7 @@ export default {
     if (url.pathname === "/check-open-ai-key") {
       const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
       return Response.json({
-        success: hasOpenAIKey,
+        success: hasOpenAIKey
       });
     }
     if (!process.env.OPENAI_API_KEY) {
@@ -123,5 +123,5 @@ export default {
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })
     );
-  },
+  }
 } satisfies ExportedHandler<Env>;

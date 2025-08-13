@@ -68,7 +68,7 @@ export const Input = ({
         {
           "add-size-sm": size === "sm",
           "add-size-md": size === "md",
-          "add-size-base": size === "base",
+          "add-size-base": size === "base"
         },
         className
       )}
@@ -82,7 +82,7 @@ export const Input = ({
         className={cn(
           "placeholder:text-ob-base-100 w-full bg-transparent focus:outline-none",
           {
-            "text-ob-destructive": !isValid,
+            "text-ob-destructive": !isValid
           }
         )}
         onChange={updateCurrentValue}
@@ -103,7 +103,7 @@ export const Input = ({
           "text-ob-destructive transition-colors": !isValid,
           "add-size-sm": size === "sm",
           "add-size-md": size === "md",
-          "add-size-base": size === "base",
+          "add-size-base": size === "base"
         },
         className
       )}
