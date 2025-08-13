@@ -21,13 +21,13 @@ import {
   Sun,
   Trash,
   PaperPlaneTilt,
-  Stop,
+  Stop
 } from "@phosphor-icons/react";
 
 // List of tools that require human confirmation
 // NOTE: this should match the keys in the executions object in tools.ts
 const toolsRequiringConfirmation: (keyof typeof tools)[] = [
-  "getWeatherInformation",
+  "getWeatherInformation"
 ];
 
 export default function Chat() {
@@ -69,7 +69,7 @@ export default function Chat() {
   };
 
   const agent = useAgent({
-    agent: "chat",
+    agent: "chat"
   });
 
   const {
@@ -80,10 +80,10 @@ export default function Chat() {
     addToolResult,
     clearHistory,
     isLoading,
-    stop,
+    stop
   } = useAgentChat({
     agent,
-    maxSteps: 5,
+    maxSteps: 5
   });
 
   // Scroll to bottom when messages change
@@ -305,9 +305,9 @@ export default function Chat() {
             handleAgentSubmit(e, {
               data: {
                 annotations: {
-                  hello: "world",
-                },
-              },
+                  hello: "world"
+                }
+              }
             });
             setTextareaHeight("auto"); // Reset height after submission
           }}
