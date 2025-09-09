@@ -27,7 +27,7 @@ import {
 } from "@phosphor-icons/react";
 
 // List of tools that require human confirmation
-// NOTE: this should match the keys in the executions object in tools.ts
+// NOTE: this should match the tools that don't have execute functions in tools.ts
 const toolsRequiringConfirmation: (keyof typeof tools)[] = [
   "getWeatherInformation"
 ];
@@ -125,7 +125,9 @@ export default function Chat() {
         isToolUIPart(part) &&
         part.state === "input-available" &&
         // Manual check inside the component
-        toolsRequiringConfirmation.includes(part.type as keyof typeof tools)
+        toolsRequiringConfirmation.includes(
+          part.type.replace("tool-", "") as keyof typeof tools
+        )
     )
   );
 
@@ -284,20 +286,21 @@ export default function Chat() {
                                   }`}
                                 >
                                   {formatTime(
-                                    new Date(
-                                      m.metadata?.createdAt as unknown as string
-                                    )
+                                    m.metadata?.createdAt
+                                      ? new Date(m.metadata.createdAt)
+                                      : new Date()
                                   )}
                                 </p>
                               </div>
                             );
                           }
 
-                          if (part.type === "tool-invocation") {
+                          if (isToolUIPart(part)) {
                             const toolCallId = part.toolCallId;
+                            const toolName = part.type.replace("tool-", "");
                             const needsConfirmation =
                               toolsRequiringConfirmation.includes(
-                                part.type as keyof typeof tools
+                                toolName as keyof typeof tools
                               );
 
                             // Skip rendering the card in debug mode
@@ -310,7 +313,20 @@ export default function Chat() {
                                 toolUIPart={part}
                                 toolCallId={toolCallId}
                                 needsConfirmation={needsConfirmation}
-                                addToolResult={addToolResult}
+                                onSubmit={({ toolCallId, result }) => {
+                                  addToolResult({
+                                    tool: part.type.replace("tool-", ""),
+                                    toolCallId,
+                                    output: result
+                                  });
+                                }}
+                                addToolResult={(toolCallId, result) => {
+                                  addToolResult({
+                                    tool: part.type.replace("tool-", ""),
+                                    toolCallId,
+                                    output: result
+                                  });
+                                }}
                               />
                             );
                           }

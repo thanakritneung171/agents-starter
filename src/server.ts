@@ -7,14 +7,14 @@ import {
   generateId,
   streamText,
   type StreamTextOnFinishCallback,
-  type ToolSet,
   stepCountIs,
   createUIMessageStream,
   convertToModelMessages,
-  createUIMessageStreamResponse
+  createUIMessageStreamResponse,
+  type ToolSet
 } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { processToolCalls } from "./utils";
+import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
 // import { env } from "cloudflare:workers";
 
@@ -31,9 +31,7 @@ const model = openai("gpt-4o-2024-11-20");
 export class Chat extends AIChatAgent<Env> {
   /**
    * Handles incoming chat messages and manages the response stream
-   * @param onFinish - Callback function executed when streaming completes
    */
-
   async onChatMessage(
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     _options?: { abortSignal?: AbortSignal }
@@ -50,10 +48,13 @@ export class Chat extends AIChatAgent<Env> {
 
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
+        // Clean up incomplete tool calls to prevent API errors
+        const cleanedMessages = cleanupMessages(this.messages);
+
         // Process any pending tool calls from previous messages
         // This handles human-in-the-loop confirmations for tools
         const processedMessages = await processToolCalls({
-          messages: this.messages,
+          messages: cleanedMessages,
           dataStream: writer,
           tools: allTools,
           executions
@@ -67,9 +68,14 @@ ${unstable_getSchedulePrompt({ date: new Date() })}
 If the user asks to schedule a task, use the schedule tool to schedule the task.
 `,
 
-          messages: convertToModelMessages(this.messages),
+          messages: convertToModelMessages(processedMessages),
           model,
-          onFinish,
+          tools: allTools,
+          // Type boundary: streamText expects specific tool types, but base class uses ToolSet
+          // This is safe because our tools satisfy ToolSet interface (verified by 'satisfies' in tools.ts)
+          onFinish: onFinish as unknown as StreamTextOnFinishCallback<
+            typeof allTools
+          >,
           stopWhen: stepCountIs(10)
         });
 

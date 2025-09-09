@@ -2,35 +2,62 @@ import { useState } from "react";
 import { Robot, CaretDown } from "@phosphor-icons/react";
 import { Button } from "@/components/button/Button";
 import { Card } from "@/components/card/Card";
-import { Tooltip } from "@/components/tooltip/Tooltip";
 import { APPROVAL } from "@/shared";
-import type { ToolUIPart } from "ai";
+
+interface ToolResultWithContent {
+  content: Array<{ type: string; text: string }>;
+}
+
+function isToolResultWithContent(
+  result: unknown
+): result is ToolResultWithContent {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "content" in result &&
+    Array.isArray((result as ToolResultWithContent).content)
+  );
+}
 
 interface ToolInvocationCardProps {
-  toolUIPart: ToolUIPart;
+  toolUIPart: {
+    type: `tool-${string}`;
+    toolCallId: string;
+    state:
+      | "input-available"
+      | "output-available"
+      | "input-streaming"
+      | "output-error";
+    input?: unknown;
+    output?: unknown;
+    errorText?: string;
+    rawInput?: unknown;
+    providerExecuted?: boolean;
+    callProviderMetadata?: Record<string, unknown>;
+  };
   toolCallId: string;
   needsConfirmation: boolean;
-  addToolResult: (args: {
-    tool: string;
+  onSubmit: ({
+    toolCallId,
+    result
+  }: {
     toolCallId: string;
-    output: unknown;
+    result: string;
   }) => void;
+  addToolResult: (toolCallId: string, result: string) => void;
 }
 
 export function ToolInvocationCard({
   toolUIPart,
   toolCallId,
   needsConfirmation,
+  onSubmit,
   addToolResult
 }: ToolInvocationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <Card
-      className={`p-4 my-3 w-full max-w-[500px] rounded-md bg-neutral-100 dark:bg-neutral-900 ${
-        needsConfirmation ? "" : "border-[#F48120]/30"
-      } overflow-hidden`}
-    >
+    <Card className="p-4 my-3 w-full max-w-[500px] rounded-md bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -74,31 +101,17 @@ export function ToolInvocationCard({
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() =>
-                  addToolResult({
-                    tool: toolUIPart.type,
-                    toolCallId,
-                    output: APPROVAL.NO
-                  })
-                }
+                onClick={() => onSubmit({ toolCallId, result: APPROVAL.NO })}
               >
                 Reject
               </Button>
-              <Tooltip content={"Accept action"}>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() =>
-                    addToolResult({
-                      tool: toolUIPart.type,
-                      toolCallId,
-                      output: APPROVAL.YES
-                    })
-                  }
-                >
-                  Approve
-                </Button>
-              </Tooltip>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onSubmit({ toolCallId, result: APPROVAL.YES })}
+              >
+                Approve
+              </Button>
             </div>
           )}
 
@@ -110,7 +123,7 @@ export function ToolInvocationCard({
               <pre className="bg-background/80 p-2 rounded-md text-xs overflow-auto whitespace-pre-wrap break-words max-w-[450px]">
                 {(() => {
                   const result = toolUIPart.output;
-                  if (typeof result === "object" && result.content) {
+                  if (isToolResultWithContent(result)) {
                     return result.content
                       .map((item: { type: string; text: string }) => {
                         if (
