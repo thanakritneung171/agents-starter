@@ -4,27 +4,21 @@ import { Button } from "@/components/button/Button";
 import { Card } from "@/components/card/Card";
 import { Tooltip } from "@/components/tooltip/Tooltip";
 import { APPROVAL } from "@/shared";
-
-interface ToolInvocation {
-  toolName: string;
-  toolCallId: string;
-  state: "call" | "result" | "partial-call";
-  step?: number;
-  args: Record<string, unknown>;
-  result?: {
-    content?: Array<{ type: string; text: string }>;
-  };
-}
+import type { ToolUIPart } from "ai";
 
 interface ToolInvocationCardProps {
-  toolInvocation: ToolInvocation;
+  toolUIPart: ToolUIPart;
   toolCallId: string;
   needsConfirmation: boolean;
-  addToolResult: (args: { toolCallId: string; result: string }) => void;
+  addToolResult: (args: {
+    tool: string;
+    toolCallId: string;
+    output: unknown;
+  }) => void;
 }
 
 export function ToolInvocationCard({
-  toolInvocation,
+  toolUIPart,
   toolCallId,
   needsConfirmation,
   addToolResult
@@ -48,8 +42,8 @@ export function ToolInvocationCard({
           <Robot size={16} className="text-[#F48120]" />
         </div>
         <h4 className="font-medium flex items-center gap-2 flex-1 text-left">
-          {toolInvocation.toolName}
-          {!needsConfirmation && toolInvocation.state === "result" && (
+          {toolUIPart.type}
+          {!needsConfirmation && toolUIPart.state === "output-available" && (
             <span className="text-xs text-[#F48120]/70">✓ Completed</span>
           )}
         </h4>
@@ -71,19 +65,20 @@ export function ToolInvocationCard({
               Arguments:
             </h5>
             <pre className="bg-background/80 p-2 rounded-md text-xs overflow-auto whitespace-pre-wrap break-words max-w-[450px]">
-              {JSON.stringify(toolInvocation.args, null, 2)}
+              {JSON.stringify(toolUIPart.input, null, 2)}
             </pre>
           </div>
 
-          {needsConfirmation && toolInvocation.state === "call" && (
+          {needsConfirmation && toolUIPart.state === "input-available" && (
             <div className="flex gap-2 justify-end">
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() =>
                   addToolResult({
+                    tool: toolUIPart.type,
                     toolCallId,
-                    result: APPROVAL.NO
+                    output: APPROVAL.NO
                   })
                 }
               >
@@ -95,8 +90,9 @@ export function ToolInvocationCard({
                   size="sm"
                   onClick={() =>
                     addToolResult({
+                      tool: toolUIPart.type,
                       toolCallId,
-                      result: APPROVAL.YES
+                      output: APPROVAL.YES
                     })
                   }
                 >
@@ -106,14 +102,14 @@ export function ToolInvocationCard({
             </div>
           )}
 
-          {!needsConfirmation && toolInvocation.state === "result" && (
+          {!needsConfirmation && toolUIPart.state === "output-available" && (
             <div className="mt-3 border-t border-[#F48120]/10 pt-3">
               <h5 className="text-xs font-medium mb-1 text-muted-foreground">
                 Result:
               </h5>
               <pre className="bg-background/80 p-2 rounded-md text-xs overflow-auto whitespace-pre-wrap break-words max-w-[450px]">
                 {(() => {
-                  const result = toolInvocation.result;
+                  const result = toolUIPart.output;
                   if (typeof result === "object" && result.content) {
                     return result.content
                       .map((item: { type: string; text: string }) => {
