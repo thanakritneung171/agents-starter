@@ -4,14 +4,17 @@ import { unstable_getSchedulePrompt } from "agents/schedule";
 
 import { AIChatAgent } from "agents/ai-chat-agent";
 import {
-  createDataStreamResponse,
   generateId,
   streamText,
   type StreamTextOnFinishCallback,
+  stepCountIs,
+  createUIMessageStream,
+  convertToModelMessages,
+  createUIMessageStreamResponse,
   type ToolSet
 } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { processToolCalls } from "./utils";
+import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
 // import { env } from "cloudflare:workers";
 
@@ -28,9 +31,7 @@ const model = openai("gpt-4o-2024-11-20");
 export class Chat extends AIChatAgent<Env> {
   /**
    * Handles incoming chat messages and manages the response stream
-   * @param onFinish - Callback function executed when streaming completes
    */
-
   async onChatMessage(
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     _options?: { abortSignal?: AbortSignal }
@@ -42,50 +43,47 @@ export class Chat extends AIChatAgent<Env> {
     // Collect all tools, including MCP tools
     const allTools = {
       ...tools,
-      ...this.mcp.unstable_getAITools()
+      ...this.mcp.getAITools()
     };
 
-    // Create a streaming response that handles both text and tool outputs
-    const dataStreamResponse = createDataStreamResponse({
-      execute: async (dataStream) => {
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        // Clean up incomplete tool calls to prevent API errors
+        const cleanedMessages = cleanupMessages(this.messages);
+
         // Process any pending tool calls from previous messages
         // This handles human-in-the-loop confirmations for tools
         const processedMessages = await processToolCalls({
-          messages: this.messages,
-          dataStream,
+          messages: cleanedMessages,
+          dataStream: writer,
           tools: allTools,
           executions
         });
 
-        // Stream the AI response using GPT-4
         const result = streamText({
-          model,
           system: `You are a helpful assistant that can do various tasks... 
 
 ${unstable_getSchedulePrompt({ date: new Date() })}
 
 If the user asks to schedule a task, use the schedule tool to schedule the task.
 `,
-          messages: processedMessages,
+
+          messages: convertToModelMessages(processedMessages),
+          model,
           tools: allTools,
-          onFinish: async (args) => {
-            onFinish(
-              args as Parameters<StreamTextOnFinishCallback<ToolSet>>[0]
-            );
-            // await this.mcp.closeConnection(mcpConnection.id);
-          },
-          onError: (error) => {
-            console.error("Error while streaming:", error);
-          },
-          maxSteps: 10
+          // Type boundary: streamText expects specific tool types, but base class uses ToolSet
+          // This is safe because our tools satisfy ToolSet interface (verified by 'satisfies' in tools.ts)
+          onFinish: onFinish as unknown as StreamTextOnFinishCallback<
+            typeof allTools
+          >,
+          stopWhen: stepCountIs(10)
         });
 
-        // Merge the AI response stream with tool execution outputs
-        result.mergeIntoDataStream(dataStream);
+        writer.merge(result.toUIMessageStream());
       }
     });
 
-    return dataStreamResponse;
+    return createUIMessageStreamResponse({ stream });
   }
   async executeTask(description: string, _task: Schedule<string>) {
     await this.saveMessages([
@@ -93,8 +91,15 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
       {
         id: generateId(),
         role: "user",
-        content: `Running scheduled task: ${description}`,
-        createdAt: new Date()
+        parts: [
+          {
+            type: "text",
+            text: `Running scheduled task: ${description}`
+          }
+        ],
+        metadata: {
+          createdAt: new Date()
+        }
       }
     ]);
   }

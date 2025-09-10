@@ -131,16 +131,14 @@ const DropdownMenu = ({
                 {item.titleContent}
               </header>
             );
-          }
-          if (item.type === "divider") {
+          } else if (item.type === "divider") {
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: TODO
               <div className="my-1.5 w-full px-2.5" key={index}>
                 <div className="h-px w-full bg-neutral-200 dark:bg-neutral-800" />
               </div>
             );
-          }
-          if (item.type === "link" || item.type === "button") {
+          } else if (item.type === "link" || item.type === "button") {
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: TODO
               <DropdownMenuPrimitive.Item asChild key={index}>
@@ -184,6 +182,7 @@ const DropdownMenu = ({
               </DropdownMenuPrimitive.Item>
             );
           }
+          return null;
         })}
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>

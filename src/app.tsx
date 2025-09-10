@@ -1,7 +1,9 @@
+/** biome-ignore-all lint/correctness/useUniqueElementIds: it's alright */
 import { useEffect, useState, useRef, useCallback, use } from "react";
 import { useAgent } from "agents/react";
+import { isToolUIPart } from "ai";
 import { useAgentChat } from "agents/ai-react";
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 import type { tools } from "./tools";
 
 // Component imports
@@ -25,7 +27,7 @@ import {
 } from "@phosphor-icons/react";
 
 // List of tools that require human confirmation
-// NOTE: this should match the keys in the executions object in tools.ts
+// NOTE: this should match the tools that don't have execute functions in tools.ts
 const toolsRequiringConfirmation: (keyof typeof tools)[] = [
   "getWeatherInformation"
 ];
@@ -72,18 +74,44 @@ export default function Chat() {
     agent: "chat"
   });
 
+  const [agentInput, setAgentInput] = useState("");
+  const handleAgentInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setAgentInput(e.target.value);
+  };
+
+  const handleAgentSubmit = async (
+    e: React.FormEvent,
+    extraData: Record<string, unknown> = {}
+  ) => {
+    e.preventDefault();
+    if (!agentInput.trim()) return;
+
+    const message = agentInput;
+    setAgentInput("");
+
+    // Send message to agent
+    await sendMessage(
+      {
+        role: "user",
+        parts: [{ type: "text", text: message }]
+      },
+      {
+        body: extraData
+      }
+    );
+  };
+
   const {
     messages: agentMessages,
-    input: agentInput,
-    handleInputChange: handleAgentInputChange,
-    handleSubmit: handleAgentSubmit,
     addToolResult,
     clearHistory,
-    isLoading,
+    status,
+    sendMessage,
     stop
-  } = useAgentChat({
-    agent,
-    maxSteps: 5
+  } = useAgentChat<unknown, UIMessage<{ createdAt: string }>>({
+    agent
   });
 
   // Scroll to bottom when messages change
@@ -91,13 +119,14 @@ export default function Chat() {
     agentMessages.length > 0 && scrollToBottom();
   }, [agentMessages, scrollToBottom]);
 
-  const pendingToolCallConfirmation = agentMessages.some((m: Message) =>
+  const pendingToolCallConfirmation = agentMessages.some((m: UIMessage) =>
     m.parts?.some(
       (part) =>
-        part.type === "tool-invocation" &&
-        part.toolInvocation.state === "call" &&
+        isToolUIPart(part) &&
+        part.state === "input-available" &&
+        // Manual check inside the component
         toolsRequiringConfirmation.includes(
-          part.toolInvocation.toolName as keyof typeof tools
+          part.type.replace("tool-", "") as keyof typeof tools
         )
     )
   );
@@ -192,7 +221,7 @@ export default function Chat() {
             </div>
           )}
 
-          {agentMessages.map((m: Message, index) => {
+          {agentMessages.map((m, index) => {
             const isUser = m.role === "user";
             const showAvatar =
               index === 0 || agentMessages[index - 1]?.role !== m.role;
@@ -257,19 +286,21 @@ export default function Chat() {
                                   }`}
                                 >
                                   {formatTime(
-                                    new Date(m.createdAt as unknown as string)
+                                    m.metadata?.createdAt
+                                      ? new Date(m.metadata.createdAt)
+                                      : new Date()
                                   )}
                                 </p>
                               </div>
                             );
                           }
 
-                          if (part.type === "tool-invocation") {
-                            const toolInvocation = part.toolInvocation;
-                            const toolCallId = toolInvocation.toolCallId;
+                          if (isToolUIPart(part)) {
+                            const toolCallId = part.toolCallId;
+                            const toolName = part.type.replace("tool-", "");
                             const needsConfirmation =
                               toolsRequiringConfirmation.includes(
-                                toolInvocation.toolName as keyof typeof tools
+                                toolName as keyof typeof tools
                               );
 
                             // Skip rendering the card in debug mode
@@ -279,10 +310,23 @@ export default function Chat() {
                               <ToolInvocationCard
                                 // biome-ignore lint/suspicious/noArrayIndexKey: using index is safe here as the array is static
                                 key={`${toolCallId}-${i}`}
-                                toolInvocation={toolInvocation}
+                                toolUIPart={part}
                                 toolCallId={toolCallId}
                                 needsConfirmation={needsConfirmation}
-                                addToolResult={addToolResult}
+                                onSubmit={({ toolCallId, result }) => {
+                                  addToolResult({
+                                    tool: part.type.replace("tool-", ""),
+                                    toolCallId,
+                                    output: result
+                                  });
+                                }}
+                                addToolResult={(toolCallId, result) => {
+                                  addToolResult({
+                                    tool: part.type.replace("tool-", ""),
+                                    toolCallId,
+                                    output: result
+                                  });
+                                }}
                               />
                             );
                           }
@@ -303,10 +347,8 @@ export default function Chat() {
           onSubmit={(e) => {
             e.preventDefault();
             handleAgentSubmit(e, {
-              data: {
-                annotations: {
-                  hello: "world"
-                }
+              annotations: {
+                hello: "world"
               }
             });
             setTextareaHeight("auto"); // Reset height after submission
@@ -346,7 +388,7 @@ export default function Chat() {
                 style={{ height: textareaHeight }}
               />
               <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
-                {isLoading ? (
+                {status === "submitted" || status === "streaming" ? (
                   <button
                     type="button"
                     onClick={stop}

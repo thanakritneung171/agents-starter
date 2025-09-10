@@ -2,8 +2,8 @@
  * Tool definitions for the AI chat agent
  * Tools can either require human confirmation or execute automatically
  */
-import { tool } from "ai";
-import { z } from "zod";
+import { tool, type ToolSet } from "ai";
+import { z } from "zod/v3";
 
 import type { Chat } from "./server";
 import { getCurrentAgent } from "agents";
@@ -12,11 +12,10 @@ import { unstable_scheduleSchema } from "agents/schedule";
 /**
  * Weather information tool that requires human confirmation
  * When invoked, this will present a confirmation dialog to the user
- * The actual implementation is in the executions object below
  */
 const getWeatherInformation = tool({
   description: "show the weather in a given city to the user",
-  parameters: z.object({ city: z.string() })
+  inputSchema: z.object({ city: z.string() })
   // Omitting execute function makes this tool require human confirmation
 });
 
@@ -27,7 +26,7 @@ const getWeatherInformation = tool({
  */
 const getLocalTime = tool({
   description: "get the local time for a specified location",
-  parameters: z.object({ location: z.string() }),
+  inputSchema: z.object({ location: z.string() }),
   execute: async ({ location }) => {
     console.log(`Getting local time for ${location}`);
     return "10am";
@@ -36,7 +35,7 @@ const getLocalTime = tool({
 
 const scheduleTask = tool({
   description: "A tool to schedule a task to be executed at a later time",
-  parameters: unstable_scheduleSchema,
+  inputSchema: unstable_scheduleSchema,
   execute: async ({ when, description }) => {
     // we can now read the agent context from the ALS store
     const { agent } = getCurrentAgent<Chat>();
@@ -71,7 +70,7 @@ const scheduleTask = tool({
  */
 const getScheduledTasks = tool({
   description: "List all tasks that have been scheduled",
-  parameters: z.object({}),
+  inputSchema: z.object({}),
   execute: async () => {
     const { agent } = getCurrentAgent<Chat>();
 
@@ -94,7 +93,7 @@ const getScheduledTasks = tool({
  */
 const cancelScheduledTask = tool({
   description: "Cancel a scheduled task using its ID",
-  parameters: z.object({
+  inputSchema: z.object({
     taskId: z.string().describe("The ID of the task to cancel")
   }),
   execute: async ({ taskId }) => {
@@ -119,13 +118,12 @@ export const tools = {
   scheduleTask,
   getScheduledTasks,
   cancelScheduledTask
-};
+} satisfies ToolSet;
 
 /**
  * Implementation of confirmation-required tools
  * This object contains the actual logic for tools that need human approval
  * Each function here corresponds to a tool above that doesn't have an execute function
- * NOTE: keys below should match toolsRequiringConfirmation in app.tsx
  */
 export const executions = {
   getWeatherInformation: async ({ city }: { city: string }) => {
