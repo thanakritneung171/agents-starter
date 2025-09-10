@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ToolUIPart } from "ai";
 import { Robot, CaretDown } from "@phosphor-icons/react";
 import { Button } from "@/components/button/Button";
 import { Card } from "@/components/card/Card";
@@ -20,21 +21,7 @@ function isToolResultWithContent(
 }
 
 interface ToolInvocationCardProps {
-  toolUIPart: {
-    type: `tool-${string}`;
-    toolCallId: string;
-    state:
-      | "input-available"
-      | "output-available"
-      | "input-streaming"
-      | "output-error";
-    input?: unknown;
-    output?: unknown;
-    errorText?: string;
-    rawInput?: unknown;
-    providerExecuted?: boolean;
-    callProviderMetadata?: Record<string, unknown>;
-  };
+  toolUIPart: ToolUIPart;
   toolCallId: string;
   needsConfirmation: boolean;
   onSubmit: ({
