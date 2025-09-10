@@ -51,8 +51,8 @@ export function ToolInvocationCard({
   toolUIPart,
   toolCallId,
   needsConfirmation,
-  onSubmit,
-  addToolResult
+  onSubmit
+  // addToolResult
 }: ToolInvocationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
