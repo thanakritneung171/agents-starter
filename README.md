@@ -1,6 +1,6 @@
 # 🤖 Chat Agent Starter Kit
 
-![agents-header](https://github.com/user-attachments/assets/f6d99eeb-1803-4495-9c5e-3cf07a37b402)
+![npm i agents command](./npm-agents-banner.svg)
 
 <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agents-starter"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"/></a>
 
