@@ -7,7 +7,7 @@ import { z } from "zod/v3";
 
 import type { Chat } from "./server";
 import { getCurrentAgent } from "agents";
-import { unstable_scheduleSchema } from "agents/schedule";
+import { scheduleSchema } from "agents/schedule";
 
 /**
  * Weather information tool that requires human confirmation
@@ -35,7 +35,7 @@ const getLocalTime = tool({
 
 const scheduleTask = tool({
   description: "A tool to schedule a task to be executed at a later time",
-  inputSchema: unstable_scheduleSchema,
+  inputSchema: scheduleSchema,
   execute: async ({ when, description }) => {
     // we can now read the agent context from the ALS store
     const { agent } = getCurrentAgent<Chat>();
