@@ -1,6 +1,6 @@
 import { routeAgentRequest, type Schedule } from "agents";
 
-import { unstable_getSchedulePrompt } from "agents/schedule";
+import { getSchedulePrompt } from "agents/schedule";
 
 import { AIChatAgent } from "agents/ai-chat-agent";
 import {
@@ -63,7 +63,7 @@ export class Chat extends AIChatAgent<Env> {
         const result = streamText({
           system: `You are a helpful assistant that can do various tasks... 
 
-${unstable_getSchedulePrompt({ date: new Date() })}
+${getSchedulePrompt({ date: new Date() })}
 
 If the user asks to schedule a task, use the schedule tool to schedule the task.
 `,
