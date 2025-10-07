@@ -4,15 +4,10 @@ import type {
   UIMessage,
   UIMessageStreamWriter,
   ToolSet,
-  CoreMessage
+  ToolCallOptions
 } from "ai";
 import { convertToModelMessages, isToolUIPart } from "ai";
 import { APPROVAL } from "./shared";
-
-interface ToolContext {
-  messages: CoreMessage[];
-  toolCallId: string;
-}
 
 function isValidToolName<K extends PropertyKey, T extends object>(
   key: K,
@@ -35,7 +30,7 @@ export async function processToolCalls<Tools extends ToolSet>({
   executions: Record<
     string,
     // biome-ignore lint/suspicious/noExplicitAny: needs a better type
-    (args: any, context: ToolContext) => Promise<unknown>
+    (args: any, context: ToolCallOptions) => Promise<unknown>
   >;
 }): Promise<UIMessage[]> {
   // Process all messages, not just the last one
@@ -55,12 +50,12 @@ export async function processToolCalls<Tools extends ToolSet>({
           ) as keyof typeof executions;
 
           // Only process tools that require confirmation (are in executions object) and are in 'input-available' state
-          if (!(toolName in executions) || part.state !== "input-available")
+          if (!(toolName in executions) || part.state !== "output-available")
             return part;
 
           let result: unknown;
 
-          if (part.input === APPROVAL.YES) {
+          if (part.output === APPROVAL.YES) {
             // User approved the tool execution
             if (!isValidToolName(toolName, executions)) {
               return part;
@@ -75,7 +70,7 @@ export async function processToolCalls<Tools extends ToolSet>({
             } else {
               result = "Error: No execute function found on tool";
             }
-          } else if (part.input === APPROVAL.NO) {
+          } else if (part.output === APPROVAL.NO) {
             result = "Error: User denied access to tool execution";
           } else {
             // If no approval input yet, leave the part as-is for user interaction
@@ -84,17 +79,14 @@ export async function processToolCalls<Tools extends ToolSet>({
 
           // Forward updated tool result to the client.
           dataStream.write({
-            type: "data-tool-result",
-            data: {
-              toolCallId: part.toolCallId,
-              result: result
-            }
+            type: "tool-output-available",
+            toolCallId: part.toolCallId,
+            output: result
           });
 
           // Return updated tool part with the actual result.
           return {
             ...part,
-            state: "output-available" as const,
             output: result
           };
         })
