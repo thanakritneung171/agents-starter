@@ -33,6 +33,23 @@ const getLocalTime = tool({
   }
 });
 
+// Example of a tool that requires confirmation
+const searchDatabase = tool({
+  description: "Search the database for user records",
+  inputSchema: z.object({
+    query: z.string(),
+    limit: z.number().optional()
+  })
+  // No execute function = requires confirmation
+});
+
+// Example of an auto-executing tool
+const getCurrentTime = tool({
+  description: "Get current server time",
+  inputSchema: z.object({}),
+  execute: async () => new Date().toISOString()
+});
+
 const scheduleTask = tool({
   description: "A tool to schedule a task to be executed at a later time",
   inputSchema: scheduleSchema,
@@ -117,7 +134,9 @@ export const tools = {
   getLocalTime,
   scheduleTask,
   getScheduledTasks,
-  cancelScheduledTask
+  cancelScheduledTask,
+  getCurrentTime,
+  searchDatabase
 } satisfies ToolSet;
 
 /**
@@ -125,9 +144,76 @@ export const tools = {
  * This object contains the actual logic for tools that need human approval
  * Each function here corresponds to a tool above that doesn't have an execute function
  */
+// export const executions = {
+//   getWeatherInformation: async ({ city }: { city: string }) => {
+//     console.log(`Getting weather information for ${city}`);
+//     return `The weather in ${city} is sunny`;
+//   }
+// };
+
 export const executions = {
   getWeatherInformation: async ({ city }: { city: string }) => {
-    console.log(`Getting weather information for ${city}`);
-    return `The weather in ${city} is sunny`;
-  }
+    console.log("getWeatherInformation--->>> ", city);
+    // Use WEATHERAPI_KEY env var (set locally in .dev.vars or via your deployment secrets)
+    const apiKey = process.env.WEATHERAPI_KEY || process.env.WEATHER_API_KEY;
+    if (!apiKey) {
+      console.error("WEATHERAPI_KEY is not set");
+      return "Weather API key is not configured. Please set the WEATHERAPI_KEY environment variable.";
+    }
+
+    const endpoint = `https://api.weatherapi.com/v1/current.json?key=${encodeURIComponent(
+      apiKey
+    )}&q=${encodeURIComponent(city)}&aqi=no`;
+
+    try {
+      const res = await fetch(endpoint);
+      console.log("Weather API response status:", res.status);
+      if (!res.ok) {
+        const body = await res.text();
+        console.error("Weather API error", res.status, body);
+        return `Error fetching weather for ${city}: ${res.status} ${res.statusText}`;
+      }
+      type WeatherApiResponse = {
+        location?: { name?: string; region?: string; country?: string };
+        current?: {
+          condition?: { text?: string };
+          temp_c?: number;
+          temp_f?: number;
+          wind_kph?: number;
+          humidity?: number;
+          precip_mm?: number;
+        };
+      };
+
+      const data = (await res.json()) as WeatherApiResponse;
+
+      const loc = data.location
+        ? `${data.location.name || city}${data.location.region ? `, ${data.location.region}` : ""}${data.location.country ? `, ${data.location.country}` : ""}`
+        : city;
+
+      const current = data.current || {};
+      const condition = current.condition?.text || "Unknown";
+      const tempC = current.temp_c !== undefined ? `${current.temp_c}°C` : "N/A";
+      const tempF = current.temp_f !== undefined ? `${current.temp_f}°F` : "N/A";
+      const windKph = current.wind_kph !== undefined ? `${current.wind_kph} kph` : "N/A";
+      const humidity = current.humidity !== undefined ? `${current.humidity}%` : "N/A";
+      const precip = current.precip_mm !== undefined ? `${current.precip_mm} mm` : "N/A";
+
+      return `Current weather in ${loc}: ${condition}, ${tempC} (${tempF}). Wind ${windKph}, humidity ${humidity}, precipitation ${precip}.`;
+    } catch (error) {
+      console.error("Error fetching weather information", error);
+      return `Error fetching weather information for ${city}: ${error}`;
+    }
+  },
+  //  searchDatabase: async ({
+  //   query,
+  //   limit
+  // }: {
+  //   query: string;
+  //   limit?: number;
+  // }) => {
+  //   // Implementation for when the tool is confirmed
+  //   const results = await db.search(query, limit);
+  //   return results;
+  // }
 };
