@@ -1,7 +1,4 @@
-/**
- * Tool definitions for the AI chat agent
- * Tools can either require human confirmation or execute automatically
- */
+
 import { tool, type ToolSet } from "ai";
 import { z } from "zod/v3";
 
@@ -9,27 +6,36 @@ import type { Chat } from "./server";
 import { getCurrentAgent } from "agents";
 import { scheduleSchema } from "agents/schedule";
 
-/**
- * Weather information tool that requires human confirmation
- * When invoked, this will present a confirmation dialog to the user
- */
+const getWeatherAndLocalTime = tool({
+  description: "Get both weather and local time for a specified city",
+  inputSchema: z.object({ city: z.string() }),
+  execute: async ({ city }, ctx) => {
+    console.log(`getWeatherAndTime1 ${city}`);
+   const weather = await executions.getWeatherInformation({ city });
+    //   if (!getLocalTime.execute) {
+    //   throw new Error("getLocalTime has no execute (requires confirmation).");
+    // }
+    // const time = await getLocalTime.execute({ location: city }, ctx);
+   const time = await getLocalTime.execute!({ location: city }, ctx);
+  //  return `Weather in ${city}: ${weather}\nLocal time in ${city}: `;
+   return `Weather in ${city}: ${weather}\nLocal time in ${city}: ${time}`;
+  }
+});
+
 const getWeatherInformation = tool({
   description: "show the weather in a given city to the user",
   inputSchema: z.object({ city: z.string() })
   // Omitting execute function makes this tool require human confirmation
 });
 
-/**
- * Local time tool that executes automatically
- * Since it includes an execute function, it will run without user confirmation
- * This is suitable for low-risk operations that don't need oversight
- */
+
 const getLocalTime = tool({
   description: "get the local time for a specified location",
   inputSchema: z.object({ location: z.string() }),
   execute: async ({ location }) => {
     console.log(`Getting local time for ${location}`);
-    return "10am";
+   
+    return "102am";
   }
 });
 
@@ -81,10 +87,7 @@ const scheduleTask = tool({
   }
 });
 
-/**
- * Tool to list all scheduled tasks
- * This executes automatically without requiring human confirmation
- */
+
 const getScheduledTasks = tool({
   description: "List all tasks that have been scheduled",
   inputSchema: z.object({}),
@@ -104,10 +107,7 @@ const getScheduledTasks = tool({
   }
 });
 
-/**
- * Tool to cancel a scheduled task by its ID
- * This executes automatically without requiring human confirmation
- */
+
 const cancelScheduledTask = tool({
   description: "Cancel a scheduled task using its ID",
   inputSchema: z.object({
@@ -125,10 +125,6 @@ const cancelScheduledTask = tool({
   }
 });
 
-/**
- * Export all available tools
- * These will be provided to the AI model to describe available capabilities
- */
 export const tools = {
   getWeatherInformation,
   getLocalTime,
@@ -136,20 +132,9 @@ export const tools = {
   getScheduledTasks,
   cancelScheduledTask,
   getCurrentTime,
-  searchDatabase
+  searchDatabase,
+  getWeatherAndLocalTime
 } satisfies ToolSet;
-
-/**
- * Implementation of confirmation-required tools
- * This object contains the actual logic for tools that need human approval
- * Each function here corresponds to a tool above that doesn't have an execute function
- */
-// export const executions = {
-//   getWeatherInformation: async ({ city }: { city: string }) => {
-//     console.log(`Getting weather information for ${city}`);
-//     return `The weather in ${city} is sunny`;
-//   }
-// };
 
 export const executions = {
   getWeatherInformation: async ({ city }: { city: string }) => {
@@ -205,15 +190,4 @@ export const executions = {
       return `Error fetching weather information for ${city}: ${error}`;
     }
   },
-  //  searchDatabase: async ({
-  //   query,
-  //   limit
-  // }: {
-  //   query: string;
-  //   limit?: number;
-  // }) => {
-  //   // Implementation for when the tool is confirmed
-  //   const results = await db.search(query, limit);
-  //   return results;
-  // }
 };
