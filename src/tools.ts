@@ -17,7 +17,6 @@ const getWeatherAndLocalTime = tool({
     // }
     // const time = await getLocalTime.execute({ location: city }, ctx);
    const time = await getLocalTime.execute!({ location: city }, ctx);
-  //  return `Weather in ${city}: ${weather}\nLocal time in ${city}: `;
    return `Weather in ${city}: ${weather}\nLocal time in ${city}: ${time}`;
   }
 });
@@ -35,7 +34,7 @@ const getLocalTime = tool({
   execute: async ({ location }) => {
     console.log(`Getting local time for ${location}`);
    
-    return "102am";
+    return "10am";
   }
 });
 
