@@ -1,7 +1,5 @@
 import { routeAgentRequest, type Schedule } from "agents";
-
 import { getSchedulePrompt } from "agents/schedule";
-
 import { AIChatAgent } from "agents/ai-chat-agent";
 import {
   generateId,
@@ -13,17 +11,28 @@ import {
   createUIMessageStreamResponse,
   type ToolSet
 } from "ai";
-import { openai } from "@ai-sdk/openai";
+// import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
 // import { env } from "cloudflare:workers";
 
-const model = openai("gpt-4o-2024-11-20");
-// Cloudflare AI Gateway
-// const openai = createOpenAI({
-//   apiKey: env.OPENAI_API_KEY,
-//   baseURL: env.GATEWAY_BASE_URL,
-// });
+// const model = openai("gpt-4o-2024-11-20");
+
+// ---------- helper: client & model ผ่าน Gateway ----------
+function getOpenAIClient(env: Env) {
+  return createOpenAI({
+    apiKey: (env as any).OPENAI_API_KEY as string,                 // คีย์ของ OpenAI เดิม
+    baseURL: ((env as any).GATEWAY_BASE_URL as string) || undefined // ชี้ไปที่ /.../gateway-name/openai
+    // ถ้าเปิด Provider Keys แบบ require token: เติม header เพิ่มได้
+    // headers: { "cf-aig-authorization": `Bearer ${(env as any).CF_AIG_TOKEN}` }
+  });
+}
+
+function getModel(env: Env) {
+  const modelName = ((env as any).OPENAI_MODEL as string) || "gpt-4o-2024-11-20";
+  return getOpenAIClient(env)(modelName);
+}
 
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
@@ -69,10 +78,8 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 `,
 
           messages: convertToModelMessages(processedMessages),
-          model,
+          model:getModel(this.env),   // ← ใช้โมเดลที่วิ่งผ่าน Gateway,
           tools: allTools,
-          // Type boundary: streamText expects specific tool types, but base class uses ToolSet
-          // This is safe because our tools satisfy ToolSet interface (verified by 'satisfies' in tools.ts)
           onFinish: onFinish as unknown as StreamTextOnFinishCallback<
             typeof allTools
           >,
@@ -112,21 +119,69 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext) {
     const url = new URL(request.url);
 
+     // บาง lib อาจอ้าง process.env —แมพแบบหลวม ๆ ให้
+    if (!(globalThis as any).process) {
+      (globalThis as any).process = { env } as any;
+    }
+
+    // --- ทดสอบ Gateway แบบง่าย ---
+    if (url.pathname === "/gateway-test") {
+      try {
+        const text = await streamText({
+          model: getModel(env),
+          messages: [{ role: "user", content: "Reply exactly: pong" }]
+        }).text;// ใช้ text แทน toText()
+
+        return Response.json({
+          ok: true,
+          via: (env as any).GATEWAY_BASE_URL ? "cloudflare-ai-gateway" : "direct",
+          baseURL: (env as any).GATEWAY_BASE_URL || "https://api.openai.com/v1",
+          model: ((env as any).OPENAI_MODEL as string) || "gpt-4o-2024-11-20",
+          text
+        });
+      } catch (e) {
+        return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
+      }
+    }
+
+     // --- ตรวจคีย์ / สถานะการตั้งค่า ---
     if (url.pathname === "/check-open-ai-key") {
-      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+      const hasOpenAIKey = !!(env as any).OPENAI_API_KEY;
       return Response.json({
-        success: hasOpenAIKey
+        success: hasOpenAIKey,
+        gatewayConfigured: !!(env as any).GATEWAY_BASE_URL
       });
     }
-    if (!process.env.OPENAI_API_KEY) {
+
+    if (!(env as any).OPENAI_API_KEY) {
       console.error(
         "OPENAI_API_KEY is not set, don't forget to set it locally in .dev.vars, and use `wrangler secret bulk .dev.vars` to upload it to production"
       );
     }
-    return (
-      // Route the request to our agent or return 404 if not found
-      (await routeAgentRequest(request, env)) ||
-      new Response("Not found", { status: 404 })
-    );
+
+    // ให้ agents จัดการเส้นทางปกติ
+    const handled = await routeAgentRequest(request, env);
+    if (handled) return handled;
+
+    // (ออปชัน) เสิร์ฟไฟล์จาก ASSETS ถ้ามี binding
+    try {
+      if ((env as any).ASSETS?.fetch) {
+        let res = await (env as any).ASSETS.fetch(request);
+        if (res.status === 404 && request.method === "GET" && !url.pathname.startsWith("/api")) {
+          res = await (env as any).ASSETS.fetch(new Request(url.origin + "/index.html"));
+        }
+        return res;
+      }
+    } catch {
+      // ignore
+    }
+
+    // return (
+    //   // Route the request to our agent or return 404 if not found
+    //   (await routeAgentRequest(request, env)) ||
+    //   new Response("Not found", { status: 404 })
+    // );
+
+    return new Response("Not found", { status: 404 });
   }
 } satisfies ExportedHandler<Env>;
