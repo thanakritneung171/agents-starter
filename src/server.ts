@@ -15,6 +15,7 @@ import {
 import { createOpenAI } from "@ai-sdk/openai";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
+import { connectToMCPServer, listMCPTools, convertMCPToolsToAIFormat } from "./mcp-client";
 // import { env } from "cloudflare:workers";
 
 // const model = openai("gpt-4o-2024-11-20");
@@ -45,14 +46,29 @@ export class Chat extends AIChatAgent<Env> {
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     _options?: { abortSignal?: AbortSignal }
   ) {
-    // const mcpConnection = await this.mcp.connect(
-    //   "https://path-to-mcp-server/sse"
-    // );
+    
+     // Initialize MCP connection if not already connected
+    const mcpServerUrl = ((this.env as any).MCP_SERVER_URL as string) || "https://my-mcp-server.devteam-d3a.workers.dev/sse";
+    let mcpAITools: Record<string, any> = {};
+    
+    try {
+      await connectToMCPServer(mcpServerUrl);
+      const mcpConnection = await this.mcp.connect(mcpServerUrl);
+      console.log(`✓ MCP server connected for this chat session`);
+      
+      // Get AI tools from mcpConnection
+      mcpAITools = this.mcp.getAITools() || {};
+    } catch (error) {
+      console.error(`✗ Failed to connect MCP server or load tools: ${error}`);
+      mcpAITools = {};
+    }
+    console.log(`✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓`);
 
-    // Collect all tools, including MCP tools
+    // Collect all tools: local tools + MCP tools (keep local tools separate)
     const allTools = {
       ...tools,
-      ...this.mcp.getAITools()
+      ...this.mcp.getAITools(),
+      ...mcpAITools
     };
 
     const stream = createUIMessageStream({
