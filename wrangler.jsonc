@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "my-agent",
+  "name": "my-agent-worker-ai",
   "main": "src/server.ts",
   "compatibility_date": "2025-08-03",
   "compatibility_flags": ["nodejs_compat"],
@@ -9,7 +9,8 @@
     "remote": true
   },
   "assets": {
-    "directory": "public"
+    // Vite outputs the built SPA to `dist` by default; use that folder for assets
+    "directory": "dist"
   },
   "durable_objects": {
     "bindings": [
