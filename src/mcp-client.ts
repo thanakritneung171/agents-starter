@@ -137,3 +137,25 @@ export async function convertMCPToolsToAIFormat(): Promise<Record<string, any>> 
 
   return aiTools;
 }
+
+/**
+ * Merge multiple MCP tool source maps into a single deduplicated map.
+ * Priority: first source wins (if a tool name appears in multiple sources, the first occurrence is kept).
+ * This is intended for merging only MCP-provided tools (not local tools).
+ */
+export function mergeMCPToolSources(sources: Array<Record<string, any> | undefined>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i] || {};
+    const sourceName = `source#${i}`;
+    for (const [name, impl] of Object.entries(src)) {
+      if (result[name]) {
+        console.log(`[MCP merge] Skipping duplicate MCP tool '${name}' from ${sourceName}; keeping existing definition.`);
+        continue;
+      }
+      result[name] = impl;
+      console.log(`[MCP merge] Registered MCP tool '${name}' from ${sourceName}`);
+    }
+  }
+  return result;
+}
